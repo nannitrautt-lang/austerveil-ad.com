@@ -12,6 +12,7 @@ export type SitePage = {
   kind: "page" | "section" | "project";
   paragraphs: string[];
   images: SiteImage[];
+  links?: string[];
 };
 
 export const pages = siteData.pages as SitePage[];

@@ -37,10 +37,25 @@ function Gallery({ page }: { page: SitePage }) {
   );
 }
 
-function ProjectGrid() {
+function isChineseRoute(slug: string) {
+  return slug.includes("chinese") || slug.endsWith("-cn");
+}
+
+function ProjectGrid({ page }: { page: SitePage }) {
+  const wantsChinese = isChineseRoute(page.slug);
+  const projectsForLanguage = allProjects.filter(
+    (project) => isChineseRoute(project.slug) === wantsChinese,
+  );
+  const bySlug = new Map(projectsForLanguage.map((project) => [project.slug, project]));
+  const linkedProjects =
+    page.links
+      ?.map((slug) => bySlug.get(slug))
+      .filter((project): project is SitePage => Boolean(project)) ?? [];
+  const projects = linkedProjects.length ? linkedProjects : projectsForLanguage;
+
   return (
     <section className="project-grid" aria-label="Project archive">
-      {allProjects.map((project) => {
+      {projects.map((project) => {
         const image = getHeroImage(project);
         return (
           <Link key={project.slug} href={urlForPage(project.slug)} className="project-card">
@@ -130,7 +145,7 @@ export function PageView({ page }: { page: SitePage }) {
         {isContact ? <ContactPanel /> : null}
       </section>
 
-      {isProjectListing ? <ProjectGrid /> : <Gallery page={page} />}
+      {isProjectListing ? <ProjectGrid page={page} /> : <Gallery page={page} />}
     </main>
   );
 }

@@ -32,6 +32,51 @@ const projectSlugs = new Set([
   "the-pangolins",
 ]);
 
+const nonProjectSlugs = new Set([
+  "",
+  "about",
+  "about-chinese",
+  "ad-publication",
+  "ad-publication-chinese",
+  "blank",
+  "careers",
+  "careers-chinese",
+  "cbn-weekly",
+  "cbn-weekly-chinese",
+  "china-daily",
+  "china-daily-chinese",
+  "china-life-chinese",
+  "city-life",
+  "contact-chinese",
+  "contact-hong-kong",
+  "contact-hong-kong-chinese",
+  "environmental-engineering-projects-c1ftm",
+  "environmental-engineering-projects-c1s5s",
+  "form",
+  "home-chinese",
+  "new-chinese",
+  "news",
+  "office-projects",
+  "office-projects-chinese",
+  "orange-a3",
+  "orange-a3-chinese",
+  "partners",
+  "partners-chinese",
+  "projects",
+  "projects-chinese",
+  "projects-re-order",
+  "residential-projects",
+  "residential-projects-chinese",
+  "retail-projects-chinese",
+  "retailfb-projects",
+  "services--skills",
+  "services--skills-chinese",
+  "studio",
+  "studio-chinese",
+  "vta",
+  "vta-chinese",
+]);
+
 const sectionSlugs = new Set([
   "about",
   "studio",
@@ -52,6 +97,13 @@ const sectionSlugs = new Set([
   "projects-chinese",
   "new-chinese",
   "contact-chinese",
+  "contact-hong-kong",
+  "contact-hong-kong-chinese",
+  "office-projects-chinese",
+  "residential-projects-chinese",
+  "retail-projects-chinese",
+  "services--skills-chinese",
+  "vta-chinese",
 ]);
 
 function decodeHtml(value) {
@@ -149,6 +201,16 @@ function extractImageUrls(html) {
   return unique.filter((url) => !url.includes("Logo-long-2024"));
 }
 
+function extractInternalSlugs(html) {
+  return [
+    ...new Set(
+      [...html.matchAll(/https:\/\/www\.austerveil-ad\.com\/([^"'\\\s<>?#]+)/g)]
+        .map((match) => decodeHtml(match[1]).replace(/^\/+|\/+$/g, ""))
+        .filter(Boolean),
+    ),
+  ];
+}
+
 function fileNameFromUrl(url) {
   try {
     return decodeURIComponent(new URL(url).pathname.split("/").pop() || "image");
@@ -190,6 +252,19 @@ await mkdir(publicAssetRoot, { recursive: true });
 await mkdir(dataDir, { recursive: true });
 
 const files = (await readdir(pageDir)).filter((file) => file.endsWith(".html"));
+const linkedProjectSlugs = new Set(projectSlugs);
+
+for (const file of ["projects.html", "projects-chinese.html", "office-projects.html", "retailfb-projects.html", "residential-projects.html"]) {
+  try {
+    const html = await readFile(path.join(pageDir, file), "utf8");
+    for (const match of html.matchAll(/https:\/\/www\.austerveil-ad\.com\/([^"'\\\s<>?#]+)/g)) {
+      const slug = decodeHtml(match[1]).replace(/^\/+|\/+$/g, "");
+      if (slug && !nonProjectSlugs.has(slug)) linkedProjectSlugs.add(slug);
+    }
+  } catch {
+    // Optional source pages may not exist in partial dumps.
+  }
+}
 const pages = [];
 const copyJobs = new Map();
 
@@ -200,6 +275,7 @@ for (const file of files) {
   const description = descriptionFromHtml(html);
   const text = cleanupText(extractBodyText(html), title);
   const imageUrls = extractImageUrls(html);
+  const links = extractInternalSlugs(html).filter((link) => link !== slug);
   const images = [];
 
   for (const url of imageUrls) {
@@ -216,9 +292,10 @@ for (const file of files) {
     slug,
     title,
     description,
-    kind: projectSlugs.has(slug) ? "project" : sectionSlugs.has(slug) ? "section" : "page",
+    kind: linkedProjectSlugs.has(slug) ? "project" : sectionSlugs.has(slug) ? "section" : "page",
     paragraphs: splitParagraphs(text).slice(0, projectSlugs.has(slug) ? 8 : 12),
     images: images.slice(0, projectSlugs.has(slug) ? 16 : 24),
+    links,
   });
 }
 
